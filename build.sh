@@ -18,6 +18,14 @@ export LOGDIR=${LOGDIR:-/var/tmp/packer-templates-logs}
 export PACKER_LOG=${PACKER_LOG:-0}
 # Use /var/tmp as temporary directory for Packer, because export of VM images can consume lot of disk space
 export TMPDIR=${TMPDIR:-/var/tmp}
+# vpcus
+export VCPUS=${VCPUS:-2}
+# memory
+export MEMORY=${MEMORY:-8192}
+# disksize
+export DISKSIZE=${DISKSIZE:-15000}
+# is headless?
+export HEADLESS=${HEADLESS:-true}
 
 PROGNAME=$(basename "$0")
 readonly PROGNAME
@@ -146,24 +154,27 @@ cmdline() {
 
         case ${NAME} in
           *windows-10-enterprise*)
-            export ISO_URL="https://software-download.microsoft.com/download/sg/19043.928.210409-1212.21h1_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_en-us.iso"
+            #export ISO_URL="https://software-download.microsoft.com/download/sg/19043.928.210409-1212.21h1_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_it-it.iso"
+            export ISO_URL="https://software-download.microsoft.com/download/sg/444969d5-f34g-4e03-ac9d-1f9786c69161/19044.1288.211006-0501.21h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_it-it.iso"
           ;;
           *windows-server-2022-*)
             export WINDOWS_TYPE="server"
-            export ISO_URL="https://software-download.microsoft.com/download/sg/20348.169.210806-2348.fe_release_svc_refresh_SERVER_EVAL_x64FRE_en-us.iso"
+            export ISO_URL="https://software-download.microsoft.com/download/sg/20348.169.210806-2348.fe_release_svc_refresh_SERVER_EVAL_x64FRE_it-it.iso"
           ;;
           *windows-server-2019-*)
             export WINDOWS_TYPE="server"
-            export ISO_URL="https://software-download.microsoft.com/download/pr/17763.737.190906-2324.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_en-us_1.iso"
+            export ISO_URL="https://software-download.microsoft.com/download/pr/17763.737.190906-2324.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_it-it_1.iso"
           ;;
           *windows-server-2016-*)
             export WINDOWS_TYPE="server"
-            export ISO_URL="https://software-download.microsoft.com/download/pr/Windows_Server_2016_Datacenter_EVAL_en-us_14393_refresh.ISO"
+            #export ISO_URL="https://software-download.microsoft.com/download/pr/Windows_Server_2016_Datacenter_EVAL_en-us_14393_refresh.ISO"
+            export ISO_URL="http://download.microsoft.com/download/0/A/4/0A42ABE9-772A-4A4B-B185-A036BA6EE093/14393.0.161119-1705.RS1_REFRESH_SERVER_EVAL_X64FRE_IT-IT.ISO"
           ;;
           *windows-server-2012_r2-*)
             export WINDOWS_RELEASE="r2"
             export WINDOWS_TYPE="server"
-            export ISO_URL="http://download.microsoft.com/download/6/2/A/62A76ABB-9990-4EFC-A4FE-C7D698DAEB96/9600.17050.WINBLUE_REFRESH.140317-1640_X64FRE_SERVER_EVAL_EN-US-IR3_SSS_X64FREE_EN-US_DV9.ISO"
+            #export ISO_URL="http://download.microsoft.com/download/6/2/A/62A76ABB-9990-4EFC-A4FE-C7D698DAEB96/9600.17050.WINBLUE_REFRESH.140317-1640_X64FRE_SERVER_EVAL_EN-US-IR3_SSS_X64FREE_EN-US_DV9.ISO"
+            export ISO_URL="http://download.microsoft.com/download/9/E/C/9EC778B5-75BA-45A0-8190-FCBE62F82D37/9600.17050.WINBLUE_REFRESH.140317-1640_X64FRE_SERVER_EVAL_IT-IT-IR3_SSS_X64FREE_IT-IT_DV9.ISO"
           ;;
           *)
             echo "*** Unsupported Windows build type: \"${NAME}\" used from \"${BUILD}\""
@@ -173,6 +184,7 @@ cmdline() {
 
         echo "* NAME: ${NAME}, WINDOWS_ARCH: ${WINDOWS_ARCH}, WINDOWS_VERSION: ${WINDOWS_VERSION}, WINDOWS_EDITION: ${WINDOWS_EDITION}"
         ISO_CHECKSUM=$(awk "/$(basename ${ISO_URL})/ { print \$1 }" win_iso.sha256)
+        echo "* ISO_CHECKSUM=$ISO_CHECKSUM"
         if [[ ${PACKER_VAGRANT_PROVIDER} = "libvirt" ]]; then
           test -f "${VIRTIO_WIN_ISO}" || curl -sL "${VIRTIO_WIN_ISO_URL}" --output "${VIRTIO_WIN_ISO}"
           if [[ ! -d "${VIRTIO_WIN_ISO_DIR}" ]]; then
@@ -195,9 +207,17 @@ cmdline() {
 
 packer_build() {
   if [[ ! -f "${PACKER_IMAGES_OUTPUT_DIR}/${BUILD}.box" ]]; then
+    echo "*** ISO_CHECKSUM=${ISO_CHECKSUM} ISO_URL=${ISO_URL}"
+    CACHE_URL_ISO="${PACKER_CACHE_DIR}/${ISO_URL##*/}"
+    [ -f "${CACHE_URL_ISO}" ] && { echo "Found ${ISO_URL##*/} in ${PACKER_CACHE_DIR}" ; ISO_URL="$CACHE_URL_ISO" ; }
     echo "*** Running packer with params: ${PACKER_CMD_PARAMS[*]}"
+    echo "Logging to file ${LOGDIR}/${BUILD}-packer.log"
     ${PACKER_BINARY} "${PACKER_CMD_PARAMS[@]}" 2>&1 | tee "${LOGDIR}/${BUILD}-packer.log"
-    ln -rfs "${PACKER_CACHE_DIR}/$(echo -n "${ISO_CHECKSUM}" | sha1sum | awk '{ print $1 }').iso" "${PACKER_CACHE_DIR}/${NAME}.iso"
+    echo "Check box file in path '${PACKER_IMAGES_OUTPUT_DIR}/${BUILD}.box'"
+    LINK_FROM="${PACKER_CACHE_DIR}/$(echo -n "${ISO_CHECKSUM}" | sha1sum | awk '{ print $1 }').iso"
+    LINK_TO="${PACKER_CACHE_DIR}/${NAME}.iso"
+    echo "Linking '$LINK_FROM' to '$LINK_TO'..."
+    ln -rfs "$LINK_FROM" "$LINK_TO"
   else
     echo -e "\n* File ${PACKER_IMAGES_OUTPUT_DIR}/${BUILD}.box already exists. Skipping....\n";
   fi

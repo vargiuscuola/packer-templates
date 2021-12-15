@@ -1,5 +1,61 @@
 # Packer Templates mainly for the Vagrant [libvirt][libvirt] and [VirtualBox][virtualbox]
 
+This is a clone of [ruzickap/packer-templates](https://github.com/ruzickap/packer-templates).
+I took few ideas (for example the local iso files) from [windowsbox/packerwindows](https://github.com/windowsbox/packerwindows).
+
+I added the script `prepare-vs.sh` which customize `*unattend.xml` and `build.sh` files to support the italian language.
+
+I also added support to the customization of the following variables of the `windows.json` and `my_windows.json` packer files through environment variables:
+
+* VCPUS
+* MEMORY
+* DISKSIZE (in MB)
+* HEADLESS (true/false)
+
+The Windows' iso files for evaluation can be found [here](https://www.microsoft.com/it-it/evalcenter/evaluate-windows-server-2016).
+
+Some links:
+
+* [Windows Server 2022](https://software-download.microsoft.com/download/sg/20348.169.210806-2348.fe_release_svc_refresh_SERVER_EVAL_x64FRE_it-it.iso)
+* [Windows Server 2019](https://software-download.microsoft.com/download/pr/17763.737.190906-2324.rs5_release_svc_refresh_SERVER_EVAL_x64FRE_it-it_1.iso)
+* [Windows Server 2016](http://download.microsoft.com/download/0/A/4/0A42ABE9-772A-4A4B-B185-A036BA6EE093/14393.0.161119-1705.RS1_REFRESH_SERVER_EVAL_X64FRE_IT-IT.ISO)
+* [Windows Server 2012 R2](http://download.microsoft.com/download/9/E/C/9EC778B5-75BA-45A0-8190-FCBE62F82D37/9600.17050.WINBLUE_REFRESH.140317-1640_X64FRE_SERVER_EVAL_IT-IT-IR3_SSS_X64FREE_IT-IT_DV9.ISO)
+* [Windows 10 Enterprise](https://software-download.microsoft.com/download/sg/444969d5-f34g-4e03-ac9d-1f9786c69161/19044.1288.211006-0501.21h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_it-it.iso)
+
+
+Ready images built with these templates can be found [here](https://app.vagrantup.com/peru).
+
+
+## Initialization
+
+```bash
+./prepare-vs.sh
+```
+
+Look at the file `win_iso.sha256`: if the iso file needed it's not present, download it in `<PACKER_CACHE_DIR>` (default to `/var/tmp/packer_cache`) and calculate and store is md5 checksum as in the following example:
+
+```bash
+ISO_URL=https://software-download.microsoft.com/download/sg/444969d5-f34g-4e03-ac9d-1f9786c69161/19044.1288.211006-0501.21h2_release_svc_refresh_CLIENTENTERPRISEEVAL_OEMRET_x64FRE_it-it.iso
+PACKER_CACHE_DIR=/var/tmp/packer_cache
+mkdir -p "$PACKER_CACHE_DIR"
+ISO_FILE="${ISO_URL##*/}"
+ISO_PATH="/var/tmp/packer_cache/${ISO_FILE}"
+curl "$ISO_URL" -o "$ISO_PATH"
+pushd "$PACKER_CACHE_DIR"
+ISO_CHECKSUM="$( sha256sum "$ISO_FILE" | cut -d' ' -f 1 )"
+popd
+if awk 'BEGIN { rc=1 } $2 == "'"$ISO_FILE"'" { rc=0 } END { exit rc }' <win_iso.sha256; then
+  # sha256 sum found
+  echo sha256 sum found: updating it...
+  awk '$2 == "'"$ISO_FILE"'" { $1 = "'"$ISO_CHECKSUM"' " } ; { print }' win_iso.sha256 | sponge win_iso.sha256
+else
+  # sha256 sum not found
+  echo sha256 sum not found: setting it...
+  echo "$ISO_CHECKSUM  $ISO_FILE" >>win_iso.sha256
+fi
+```
+
+
 ## Customized+Clean/Minimal boxes for [libvirt][libvirt] and [VirtualBox][virtualbox]
 
 [libvirt]: https://github.com/vagrant-libvirt/vagrant-libvirt
@@ -199,6 +255,18 @@ git clone --recurse-submodules https://github.com/ruzickap/packer-templates.git
 cd packer-templates
 ```
 
+To see the configurable parameters and their defaults:
+
+```bash
+<build.sh grep ^export
+```
+
+To test the run to see the command to be executed without actually executing it:
+
+```bash
+PACKER_BINARY='#packer' ./build.sh [...]
+```
+
 * Ubuntu:
 
   ```bash
@@ -339,3 +407,37 @@ cd packer-templates
   directory using `vagrant add/up/ssh/winrm/destroy`
 
 GitLab CI configuration (obsolete) can be found here: [GitLab_CI_configuration.md](docs/GitLab_CI_configuration.md)
+
+## Provisioning with vagrant
+
+Have a look [here](https://computingforgeeks.com/using-vagrant-with-libvirt-on-linux/), for example.
+
+Vagrant images are created in `PACKER_IMAGES_OUTPUT_DIR` (default to `/var/tmp/packer-templates-images`).
+Images are `.box` files that can be run by vagrant. 
+
+You can add the box in vagrant local repository with:
+
+```bash
+vagrant box add /var/tmp/packer-templates-images/my_windows-10-enterprise-x64-eval-libvirt.box --name vargiuscuola/windows-10-enterprise-x64
+vagrant box list
+vagrant init vargiuscuola/windows-10-enterprise-x64
+```
+
+The last command (`vagrant init`) create a configuration file which can be customized.
+Take the template `Vagrantfile-windows.template` as a starting point.
+
+See also the test script `vagrant_init_destroy_boxes.sh`.
+
+[Qua](https://github.com/vagrant-libvirt/vagrant-libvirt) ci sono informazioni sui parametri che si possono impostare con il provider `libvirt`.
+
+When all is configured, run:
+
+```sh
+vagrant up --provider=libvirt
+```
+
+Before, make sure to nistall the [libvirt plugin for vagrant](https://github.com/vagrant-libvirt/vagrant-libvirt) con:
+
+```bash
+vagrant plugin install vagrant-libvirt
+```

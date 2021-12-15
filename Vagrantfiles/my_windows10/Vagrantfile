@@ -1,0 +1,82 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure("2") do |config|
+
+  config.vm.provider :libvirt do |libvirt|
+    libvirt.disk_bus       = "virtio"
+    libvirt.driver         = "kvm"
+    #libvirt.graphics_type  = "spice"
+    libvirt.graphics_type  = "vnc"
+    libvirt.graphics_port  = "5910"
+    libvirt.graphics_ip    = "0.0.0.0"
+    libvirt.nic_model_type = "virtio"
+    libvirt.sound_type     = "ich6"
+    libvirt.video_type     = "qxl"
+#    libvirt.mgmt_attach    = false
+    libvirt.input :type => "tablet", :bus => "usb"
+
+    libvirt.channel :type  => 'spicevmc', :target_name => 'com.redhat.spice.0',     :target_type => 'virtio'
+    libvirt.channel :type  => 'unix',     :target_name => 'org.qemu.guest_agent.0', :target_type => 'virtio'
+    libvirt.random  :model => 'random'
+
+    # Enable Hyper-V enlightments: https://blog.wikichoon.com/2014/07/enabling-hyper-v-enlightenments-with-kvm.html
+    libvirt.hyperv_feature :name => 'relaxed', :state => 'on'
+    # stimer can not be enabled because it needs clock / hypervclock (https://bugzilla.redhat.com/show_bug.cgi?id=1816670) settings which are not supported by vagrant-libvirt
+    # https://github.com/ruzickap/packer-templates/issues/154
+    # libvirt.hyperv_feature :name => 'stimer',  :state => 'on'
+    libvirt.hyperv_feature :name => 'synic',   :state => 'on'
+    libvirt.hyperv_feature :name => 'vapic',   :state => 'on'
+    libvirt.hyperv_feature :name => 'vpindex', :state => 'on'
+    libvirt.memory = 2048
+  end
+
+  config.vm.box = "vargiuscuola/windows-10-enterprise-x64"
+  config.vm.network :public_network,
+    ip: "172.25.100.9",
+    netmask: "255.255.0.0",
+    dev: "vm-lan-br",
+    network_name: "bridged-lan",
+    bridge: "vm-lan-br",
+    type: "bridge",
+    mode: "bridge"
+
+  config.vm.provision "shell",
+    run: "always",
+    inline: "route change 0.0.0.0 mask 0.0.0.0 172.25.0.1"
+
+  # Port forward for RDP
+#  config.vm.network :forwarded_port, guest: 3389, host: 3389, id: "rdp", auto_correct:true
+#  config.vm.network :forwarded_port, guest: 5910, host: 5910, id: "vnc", auto_correct:true
+  # Port forward for WinRM
+#  config.vm.network :forwarded_port, guest: 5986, host: 5986, id: "winrm-ssl", auto_correct:true
+#  config.vm.network :forwarded_port, guest: 5985, host: 5985, id: "winrm", auto_correct:true
+
+  config.vm.boot_timeout      = 1000
+  config.vm.communicator      = "winrm"
+  config.vm.guest             = :windows
+  config.windows.halt_timeout = 15
+  config.winrm.password       = "vagrant"
+  config.winrm.retry_limit    = 30
+  config.winrm.username       = "vagrant"
+  config.winrm.transport      = :ssl
+  config.winrm.ssl_peer_verification = false
+
+  # Disable NFS sharing (==> default: Mounting NFS shared folders...)
+  config.vm.synced_folder ".", "/vagrant", type: "nfs", disabled: true
+
+  if Vagrant.has_plugin?("vagrant-winrm-syncedfolders")
+    config.vm.synced_folder ".", "/vagrant", type: "winrm"
+  else
+    config.vm.synced_folder ".", "/vagrant", disabled: true
+  end
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Ansible, Chef, Docker, Puppet and Salt are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  # config.vm.provision "shell", inline: <<-SHELL
+  #   apt-get update
+  #   apt-get install -y apache2
+  # SHELL
+end
+
