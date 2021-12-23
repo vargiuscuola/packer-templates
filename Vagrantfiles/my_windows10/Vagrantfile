@@ -1,6 +1,3 @@
-# -*- mode: ruby -*-
-# vi: set ft=ruby :
-
 Vagrant.configure("2") do |config|
 
   config.vm.provider :libvirt do |libvirt|
@@ -8,7 +5,7 @@ Vagrant.configure("2") do |config|
     libvirt.driver         = "kvm"
     #libvirt.graphics_type  = "spice"
     libvirt.graphics_type  = "vnc"
-    libvirt.graphics_port  = "5910"
+    libvirt.graphics_port  = "5909"
     libvirt.graphics_ip    = "0.0.0.0"
     libvirt.nic_model_type = "virtio"
     libvirt.sound_type     = "ich6"
@@ -28,7 +25,7 @@ Vagrant.configure("2") do |config|
     libvirt.hyperv_feature :name => 'synic',   :state => 'on'
     libvirt.hyperv_feature :name => 'vapic',   :state => 'on'
     libvirt.hyperv_feature :name => 'vpindex', :state => 'on'
-    libvirt.memory = 2048
+    libvirt.memory = 4096
   end
 
   config.vm.box = "vargiuscuola/windows-10-enterprise-x64"

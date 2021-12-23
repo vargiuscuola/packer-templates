@@ -23,10 +23,11 @@ export VCPUS=${VCPUS:-2}
 # memory
 export MEMORY=${MEMORY:-8192}
 # disksize
-export DISKSIZE=${DISKSIZE:-15000}
+export DISKSIZE=${DISKSIZE:-25000}
 # is headless?
 export HEADLESS=${HEADLESS:-true}
 
+ISO_URL=""
 PROGNAME=$(basename "$0")
 readonly PROGNAME
 readonly ARGS=$*
@@ -184,7 +185,7 @@ cmdline() {
 
         echo "* NAME: ${NAME}, WINDOWS_ARCH: ${WINDOWS_ARCH}, WINDOWS_VERSION: ${WINDOWS_VERSION}, WINDOWS_EDITION: ${WINDOWS_EDITION}"
         ISO_CHECKSUM=$(awk "/$(basename ${ISO_URL})/ { print \$1 }" win_iso.sha256)
-        echo "* ISO_CHECKSUM=$ISO_CHECKSUM"
+        echo "* ISO_CHECKSUM=$ISO_CHECKSUM ISO_URL=${ISO_URL}"
         if [[ ${PACKER_VAGRANT_PROVIDER} = "libvirt" ]]; then
           test -f "${VIRTIO_WIN_ISO}" || curl -sL "${VIRTIO_WIN_ISO_URL}" --output "${VIRTIO_WIN_ISO}"
           if [[ ! -d "${VIRTIO_WIN_ISO_DIR}" ]]; then
@@ -207,9 +208,10 @@ cmdline() {
 
 packer_build() {
   if [[ ! -f "${PACKER_IMAGES_OUTPUT_DIR}/${BUILD}.box" ]]; then
-    echo "*** ISO_CHECKSUM=${ISO_CHECKSUM} ISO_URL=${ISO_URL}"
-    CACHE_URL_ISO="${PACKER_CACHE_DIR}/${ISO_URL##*/}"
-    [ -f "${CACHE_URL_ISO}" ] && { echo "Found ${ISO_URL##*/} in ${PACKER_CACHE_DIR}" ; ISO_URL="$CACHE_URL_ISO" ; }
+    if [ -n "$ISO_URL" ]; then
+      CACHE_URL_ISO="${PACKER_CACHE_DIR}/${ISO_URL##*/}"
+      [ -f "${CACHE_URL_ISO}" ] && { echo "Found ${ISO_URL##*/} in ${PACKER_CACHE_DIR}" ; ISO_URL="$CACHE_URL_ISO" ; }
+    fi
     echo "*** Running packer with params: ${PACKER_CMD_PARAMS[*]}"
     echo "Logging to file ${LOGDIR}/${BUILD}-packer.log"
     ${PACKER_BINARY} "${PACKER_CMD_PARAMS[@]}" 2>&1 | tee "${LOGDIR}/${BUILD}-packer.log"

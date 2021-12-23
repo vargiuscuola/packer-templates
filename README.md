@@ -4,6 +4,8 @@ This is a clone of [ruzickap/packer-templates](https://github.com/ruzickap/packe
 I took few ideas (for example the local iso files) from [windowsbox/packerwindows](https://github.com/windowsbox/packerwindows).
 
 I added the script `prepare-vs.sh` which customize `*unattend.xml` and `build.sh` files to support the italian language.
+I modified `ansible/roles/ansible-role-my_common_defaults/tasks/Win32NT-common.yml` to ignore errors on `Enable-NetFirewallRule -DisplayGroup` command and added Italian localization of `DisaplyGroup`'s.
+I added packages to `ansible/roles/ansible-role-my_common_defaults/vars/Windows.yml`.
 
 I also added support to the customization of the following variables of the `windows.json` and `my_windows.json` packer files through environment variables:
 
@@ -425,6 +427,8 @@ vagrant init vargiuscuola/windows-10-enterprise-x64
 
 The last command (`vagrant init`) create a configuration file which can be customized.
 Take the template `Vagrantfile-windows.template` as a starting point.
+
+The directory `Vagrantfiles/` contains the `Vagrantfile` configuration files for different VM.
 
 See also the test script `vagrant_init_destroy_boxes.sh`.
 
